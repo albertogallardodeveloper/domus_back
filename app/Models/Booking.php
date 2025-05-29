@@ -17,6 +17,10 @@ class Booking extends Model
         'stripe_payment_intent_id',
         'additional_details',
         'promo_code_id',
+        'has_issue',
+        'refund_amount',
+        'cancelled_at',
+        'refund_id',
     ];
 
     public function user()
@@ -33,5 +37,17 @@ class Booking extends Model
     {
         return $this->belongsTo(PromoCode::class);
     }
+
+    public function review()
+    {
+        return $this->hasOne(Review::class);
+    }
+
+    public function userApp()
+{
+    return $this->belongsTo(UserApp::class, 'user_app_id');
+}
+
+
 
 }

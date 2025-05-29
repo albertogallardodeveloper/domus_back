@@ -75,5 +75,13 @@ class UserApp extends Authenticatable
         return $this->belongsToMany(PromoCode::class, 'promo_code_user')->withTimestamps();
     }
 
+    public function conversations()
+    {
+        return $this->belongsToMany(Conversation::class, 'conversation_user_app');
+    }
 
+    public function messages()
+    {
+        return $this->hasMany(Message::class, 'sender_id');
+    }
 }

@@ -9,7 +9,7 @@ class Review extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['service_id', 'user_app_id', 'rating', 'comment'];
+    protected $fillable = ['booking_id', 'service_id', 'user_app_id', 'rating', 'comment'];
 
     public function service()
     {
@@ -20,4 +20,10 @@ class Review extends Model
     {
         return $this->belongsTo(UserApp::class, 'user_app_id');
     }
+
+    public function booking()
+    {
+        return $this->belongsTo(Booking::class);
+    }
+
 }

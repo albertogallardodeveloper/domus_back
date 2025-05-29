@@ -21,7 +21,7 @@ class StripeWebhookController extends Controller
             $paymentIntent = $event['data']['object'];
             $paymentIntentId = $paymentIntent['id'];
 
-            // Busca la reserva por payment_intent_id
+            // Busca la reserva por stripe_payment_intent_id
             $booking = Booking::where('stripe_payment_intent_id', $paymentIntentId)->first();
             if ($booking) {
                 $booking->status = 'paid';
