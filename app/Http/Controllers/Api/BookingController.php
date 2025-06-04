@@ -370,6 +370,34 @@ class BookingController extends Controller
     }
 }
 
+public function acceptBooking($id)
+{
+    $booking = Booking::findOrFail($id);
+
+    if ($booking->status !== 'pending') {
+        return response()->json(['error' => 'Solo se pueden aceptar reservas pendientes.'], 400);
+    }
+
+    $booking->status = 'confirmed';
+    $booking->save();
+
+    return response()->json(['message' => 'Reserva aceptada correctamente.']);
+}
+
+
+public function rejectBooking($id)
+{
+    $booking = Booking::findOrFail($id);
+
+    if ($booking->status !== 'pending') {
+        return response()->json(['error' => 'Solo se pueden rechazar reservas pendientes.'], 400);
+    }
+
+    $booking->status = 'rejected';
+    $booking->save();
+
+    return response()->json(['message' => 'Reserva rechazada correctamente.']);
+}
 
 
 

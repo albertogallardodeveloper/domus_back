@@ -56,9 +56,16 @@ class ServiceController extends Controller
 
     public function byCategory($categoryId)
     {
-        return Service::with('professional')
-            ->where('service_category_id', $categoryId)
-            ->get();
+        try {
+            return Service::with('professional')
+                ->where('service_category_id', $categoryId)
+                ->get();
+        } catch (\Throwable $e) {
+            return response()->json([
+                'error' => 'Error al obtener servicios',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 
 }

@@ -95,3 +95,33 @@ Route::get('/chat/conversations/{conversation}/messages', [MessageController::cl
 Route::middleware('auth:sanctum')->get('/chat/booking-conversation/{id}', [BookingController::class, 'getOrCreateBookingConversation']);
 Route::middleware('auth:sanctum')->post('/chat/user-conversation', [ChatController::class, 'getOrCreatePrivateConversation']);
 Route::get('/bookings/{id}/conversation', [ChatController::class, 'getSupportConversationForBooking']);
+Route::post('/bookings/{id}/accept', [BookingController::class, 'acceptBooking']);
+Route::post('/bookings/{id}/reject', [BookingController::class, 'rejectBooking']);
+Route::get('/bookings/professional/{id}/pending', function ($id) {
+    return \App\Models\Booking::with(['user', 'service'])
+        ->whereHas('service', function ($q) use ($id) {
+            $q->where('user_app_id', $id);
+        })
+        ->where('status', 'pending')
+        ->orderBy('service_day')
+        ->get();
+});
+Route::get('/bookings/professional/{id}/accepted', function ($id) {
+    return \App\Models\Booking::with(['user', 'service'])
+        ->whereHas('service', function ($q) use ($id) {
+            $q->where('user_app_id', $id);
+        })
+        ->where('status', 'confirmed')
+        ->orderBy('service_day')
+        ->get();
+});
+// routes/api.php
+Route::get('/bookings/professional/{id}/all', function ($id) {
+    return \App\Models\Booking::with(['user', 'service'])
+        ->whereHas('service', function ($q) use ($id) {
+            $q->where('user_app_id', $id);
+        })
+        ->orderBy('service_day')
+        ->get();
+});
+
