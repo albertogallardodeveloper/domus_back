@@ -76,31 +76,34 @@ class UserAppController extends Controller
         return $users_app->load(['languages', 'locations', 'addresses']);
     }
 
-    public function update(Request $request, UserApp $users_app)
-    {
-        $users_app->update($request->except(['languages', 'locations', 'addresses', 'password']));
+public function update(Request $request, UserApp $users_app)
+{
+    // Actualiza campos simples
+    $users_app->update($request->except(['languages', 'locations', 'addresses', 'password']));
 
-        if ($request->has('languages')) {
-            $users_app->languages()->sync($request->languages);
-        }
-
-        if ($request->has('locations')) {
-            $users_app->locations()->sync($request->locations);
-        }
-
-        if ($request->has('addresses')) {
-            $addressIds = [];
-
-            foreach ($request->addresses as $addrText) {
-                $address = Address::create(['address' => $addrText]);
-                $addressIds[] = $address->id;
-            }
-
-            $users_app->addresses()->sync($addressIds);
-        }
-
-        return $users_app->load(['languages', 'locations', 'addresses']);
+    // Sincronizar idiomas
+    if ($request->has('languages')) {
+        $users_app->languages()->sync($request->languages);
     }
+
+    // Sincronizar ubicaciones
+    if ($request->has('locations')) {
+        $users_app->locations()->sync($request->locations);
+    }
+
+    // Direcciones: crea nuevas si no existen, y sincroniza
+    if ($request->has('addresses')) {
+        $addressIds = [];
+        foreach ($request->addresses as $addrText) {
+            $address = \App\Models\Address::firstOrCreate(['address' => $addrText]);
+            $addressIds[] = $address->id;
+        }
+        $users_app->addresses()->sync($addressIds);
+    }
+
+    return $users_app->load(['languages', 'locations', 'addresses']);
+}
+
 
     public function destroy(UserApp $users_app)
     {
@@ -118,5 +121,13 @@ class UserAppController extends Controller
 
         return response()->json($address);
     }
+
+    public function languages() {
+    return \App\Models\Language::all();
+}
+public function locations() {
+    return \App\Models\Location::all();
+}
+
 
 }

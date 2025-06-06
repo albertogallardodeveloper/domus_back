@@ -20,6 +20,9 @@ use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\StripeWebhookController;
 use App\Http\Controllers\Api\PromoCodeController;
 use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\ProfilePictureController;
+
+Route::post('/upload/profile-picture', [ProfilePictureController::class, 'upload']);
 
 /*
 |--------------------------------------------------------------------------
@@ -125,3 +128,12 @@ Route::get('/bookings/professional/{id}/all', function ($id) {
         ->get();
 });
 
+Route::get('/languages', [UserAppController::class, 'languages']);
+Route::get('/locations', [UserAppController::class, 'locations']);
+
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/reviews/professional', [ReviewController::class, 'reviewsForProfessional']);
+    Route::get('/reviews/client', [ReviewController::class, 'reviewsByClient']);
+});
+Route::apiResource('reviews', ReviewController::class)->only(['index', 'store']);
