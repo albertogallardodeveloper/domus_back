@@ -6,10 +6,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 use App\Models\Language;
 use App\Models\Location;
 use App\Models\Address;
-use Laravel\Sanctum\HasApiTokens;
 
 class UserApp extends Authenticatable
 {
@@ -24,6 +24,7 @@ class UserApp extends Authenticatable
         'password',
         'profile_picture',
         'email_verified',
+        'email_verification_code',
         'phone_number',
         'services',
         'is_client',
@@ -37,12 +38,12 @@ class UserApp extends Authenticatable
     ];
 
     protected $casts = [
-        'email_verified' => 'boolean',
-        'is_client' => 'boolean',
-        'is_professional' => 'boolean',
-        'privacy_policy' => 'boolean',
-        'terms_conditions' => 'boolean',
-        'services' => 'array',
+        'email_verified'    => 'boolean',
+        'is_client'         => 'boolean',
+        'is_professional'   => 'boolean',
+        'privacy_policy'    => 'boolean',
+        'terms_conditions'  => 'boolean',
+        'services'          => 'array',
     ];
 
     public function languages(): BelongsToMany
