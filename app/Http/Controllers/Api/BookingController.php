@@ -61,11 +61,27 @@ class BookingController extends Controller
         $amountInCents = intval(round($discountedTotal * 100));
 
         try {
+            \Log::info('Clave Stripe usada:', ['clave' => env('STRIPE_SECRET')]);
+
             Stripe::setApiKey(env('STRIPE_SECRET'));
+
+            // === NUEVO: Stripe Connect con comisión ===
+            // Suponemos que el servicio tiene relación ->professional y este tiene stripe_account_id
+            $professional = $service->professional;
+
+            if (! $professional || ! $professional->stripe_account_id) {
+                return response()->json(['error' => 'El profesional no tiene cuenta Stripe conectada.'], 422);
+            }
+
+            $platformFee = intval($amountInCents * 0.10); // 10% de comisión
 
             $paymentIntent = PaymentIntent::create([
                 'amount' => $amountInCents,
                 'currency' => env('STRIPE_CURRENCY', 'chf'),
+                'application_fee_amount' => $platformFee,
+                'transfer_data' => [
+                    'destination' => $professional->stripe_account_id,
+                ],
                 'metadata' => [
                     'user_app_id' => $request->user_app_id,
                     'service_id' => $request->service_id,
@@ -82,13 +98,13 @@ class BookingController extends Controller
                 'service_day' => $request->service_day,
                 'status' => 'pending',
                 'stripe_payment_intent_id' => $paymentIntent->id,
+                'platform_fee' => $platformFee,
                 'additional_details' => $request->additional_details,
                 'promo_code_id' => $promoCode?->id,
             ]);
 
             if ($promoCode) {
                 $promoCode->increment('redemptions');
-
                 $promoCode->users()->attach($request->user_app_id, [
                     'booking_id' => $booking->id,
                     'used_at' => now()
@@ -111,7 +127,7 @@ class BookingController extends Controller
             'service.category',
             'service.professional',
             'promoCode',
-            'review' // <- esta es la relación que definiste en Booking.php
+            'review'
         ])
         ->where('user_app_id', $userId)
         ->orderBy('service_day', 'desc')
@@ -119,7 +135,6 @@ class BookingController extends Controller
 
         return response()->json($bookings);
     }
-
 
     public function confirmService(Request $request, $id)
     {
@@ -186,7 +201,7 @@ class BookingController extends Controller
                     'booking_id' => $booking->id,
                 ]);
 
-            $conversation->participants()->syncWithoutDetaching([$user->id, 1]);
+                $conversation->participants()->syncWithoutDetaching([$user->id, 1]);
 
                 // Mensaje del sistema
                 \App\Models\Message::create([
@@ -219,7 +234,7 @@ class BookingController extends Controller
 
     public function getSupportConversation($id)
     {
-            Log::debug('🔍 ID recibido en getSupportConversation', ['id' => $id]);
+        Log::debug('🔍 ID recibido en getSupportConversation', ['id' => $id]);
 
         try {
             $user = auth()->user();
@@ -240,7 +255,6 @@ class BookingController extends Controller
             return response()->json(['error' => 'Error interno.'], 500);
         }
     }
-
 
     public function cancel(Request $request, Booking $booking)
     {
@@ -321,84 +335,80 @@ class BookingController extends Controller
     }
 
     public function getOrCreateUserChat(Request $request)
-{
+    {
         \Log::info('🟢 Entrando en getOrCreateUserChat');
 
-    try {
-        
-        $user = auth()->user();
+        try {
+            $user = auth()->user();
 
-        $request->validate([
-            'other_user_id' => 'required|exists:users_app,id',
-        ]);
-
-        $otherUserId = $request->other_user_id;
-
-        // Evitar chat consigo mismo
-        if ($user->id == $otherUserId) {
-            return response()->json(['error' => 'No puedes chatear contigo mismo.'], 400);
-        }
-
-        // Buscar si ya existe conversación privada entre ambos
-        $conversation = \App\Models\Conversation::where('type', 'user')
-            ->whereHas('participants', fn($q) => $q->where('user_app_id', $user->id))
-            ->whereHas('participants', fn($q) => $q->where('user_app_id', $otherUserId))
-            ->first();
-
-        // Si no existe, la creamos
-        if (!$conversation) {
-            $conversation = \App\Models\Conversation::create([
-                'type' => 'user',
+            $request->validate([
+                'other_user_id' => 'required|exists:users_app,id',
             ]);
 
-            $conversation->participants()->syncWithoutDetaching([$user->id, $otherUserId]);
+            $otherUserId = $request->other_user_id;
 
-            // Mensaje del sistema opcional
-            \App\Models\Message::create([
+            // Evitar chat consigo mismo
+            if ($user->id == $otherUserId) {
+                return response()->json(['error' => 'No puedes chatear contigo mismo.'], 400);
+            }
+
+            // Buscar si ya existe conversación privada entre ambos
+            $conversation = \App\Models\Conversation::where('type', 'user')
+                ->whereHas('participants', fn($q) => $q->where('user_app_id', $user->id))
+                ->whereHas('participants', fn($q) => $q->where('user_app_id', $otherUserId))
+                ->first();
+
+            // Si no existe, la creamos
+            if (!$conversation) {
+                $conversation = \App\Models\Conversation::create([
+                    'type' => 'user',
+                ]);
+
+                $conversation->participants()->syncWithoutDetaching([$user->id, $otherUserId]);
+
+                // Mensaje del sistema opcional
+                \App\Models\Message::create([
+                    'conversation_id' => $conversation->id,
+                    'sender_id' => null,
+                    'content' => '📢 Chat iniciado entre ambos usuarios.',
+                ]);
+            }
+
+            return response()->json([
                 'conversation_id' => $conversation->id,
-                'sender_id' => null,
-                'content' => '📢 Chat iniciado entre ambos usuarios.',
             ]);
+        } catch (\Throwable $e) {
+            \Log::error('❌ Error al obtener o crear conversación usuario-usuario: ' . $e->getMessage());
+            return response()->json(['error' => 'Error interno.'], 500);
+        }
+    }
+
+    public function acceptBooking($id)
+    {
+        $booking = Booking::findOrFail($id);
+
+        if ($booking->status !== 'pending') {
+            return response()->json(['error' => 'Solo se pueden aceptar reservas pendientes.'], 400);
         }
 
-        return response()->json([
-            'conversation_id' => $conversation->id,
-        ]);
-    } catch (\Throwable $e) {
-        \Log::error('❌ Error al obtener o crear conversación usuario-usuario: ' . $e->getMessage());
-        return response()->json(['error' => 'Error interno.'], 500);
-    }
-}
+        $booking->status = 'confirmed';
+        $booking->save();
 
-public function acceptBooking($id)
-{
-    $booking = Booking::findOrFail($id);
-
-    if ($booking->status !== 'pending') {
-        return response()->json(['error' => 'Solo se pueden aceptar reservas pendientes.'], 400);
+        return response()->json(['message' => 'Reserva aceptada correctamente.']);
     }
 
-    $booking->status = 'confirmed';
-    $booking->save();
+    public function rejectBooking($id)
+    {
+        $booking = Booking::findOrFail($id);
 
-    return response()->json(['message' => 'Reserva aceptada correctamente.']);
-}
+        if ($booking->status !== 'pending') {
+            return response()->json(['error' => 'Solo se pueden rechazar reservas pendientes.'], 400);
+        }
 
+        $booking->status = 'rejected';
+        $booking->save();
 
-public function rejectBooking($id)
-{
-    $booking = Booking::findOrFail($id);
-
-    if ($booking->status !== 'pending') {
-        return response()->json(['error' => 'Solo se pueden rechazar reservas pendientes.'], 400);
+        return response()->json(['message' => 'Reserva rechazada correctamente.']);
     }
-
-    $booking->status = 'rejected';
-    $booking->save();
-
-    return response()->json(['message' => 'Reserva rechazada correctamente.']);
-}
-
-
 
 }

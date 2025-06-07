@@ -15,6 +15,8 @@ class Booking extends Model
         'service_day',
         'status',
         'stripe_payment_intent_id',
+        'platform_fee',
+        'stripe_transfer_id',
         'additional_details',
         'promo_code_id',
         'has_issue',

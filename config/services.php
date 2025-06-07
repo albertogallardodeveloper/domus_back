@@ -32,7 +32,9 @@ return [
     ],
 
     'stripe' => [
-    'secret' => env('STRIPE_SECRET'),
+        'secret'  => env('STRIPE_SECRET'),
+        'key'     => env('STRIPE_PUBLISHABLE_KEY'),
+        'connect_enabled' => env('STRIPE_CONNECT_ENABLED', false),
     ],
 
 ];
