@@ -31,10 +31,12 @@ Route::post('/upload/profile-picture', [ProfilePictureController::class, 'upload
 */
 
 // 🔐 Rutas de autenticación y verificación
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/verify-email-code', [AuthController::class, 'verifyCode']);
-Route::post('/verify-email', [AuthController::class, 'verifyEmail']);
-Route::post('/resend-verification', [AuthController::class, 'resendVerification']);
+Route::post('/login',                  [AuthController::class, 'login']);
+Route::post('/send-verification-code', [AuthController::class, 'sendVerificationCode']);  // <-- añadida
+Route::post('/verify-code',            [AuthController::class, 'verifyCode']);            // <-- añadida
+Route::post('/verify-email-code',      [AuthController::class, 'verifyCode']);
+Route::post('/verify-email',           [AuthController::class, 'verifyEmail']);
+Route::post('/resend-verification',    [AuthController::class, 'resendVerification']);
 
 // 🔐 Usuario autenticado (solo si usas Sanctum)
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
@@ -91,23 +93,23 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // 💬 Chat (con soporte y entre usuarios)
     Route::prefix('chat')->group(function () {
-        Route::post('/support', [ChatController::class, 'getOrCreateSupportConversation']); // POST con user_app_id
+        Route::post('/support', [ChatController::class, 'getOrCreateSupportConversation']);
         Route::get('/conversations/{id}/messages', [ChatController::class, 'getMessages']);
         Route::post('/conversations/{id}/messages', [ChatController::class, 'sendMessage']);
     });
 
     // Rutas protegidas de review
     Route::get('/reviews/professional', [ReviewController::class, 'reviewsForProfessional']);
-    Route::get('/reviews/client', [ReviewController::class, 'reviewsByClient']);
+    Route::get('/reviews/client',       [ReviewController::class, 'reviewsByClient']);
 });
 
-// Rutas para obtener conversaciones sin middleware Sanctum (acceso público limitado)
+// Rutas para obtener conversaciones sin middleware Sanctum
 Route::get('/chat/conversations/{conversation}/messages', [ChatController::class, 'index']);
 Route::middleware('auth:sanctum')->get('/chat/booking-conversation/{id}', [BookingController::class, 'getOrCreateBookingConversation']);
-Route::middleware('auth:sanctum')->post('/chat/user-conversation', [ChatController::class, 'getOrCreatePrivateConversation']);
-Route::get('/bookings/{id}/conversation', [ChatController::class, 'getSupportConversationForBooking']);
-Route::post('/bookings/{id}/accept', [BookingController::class, 'acceptBooking']);
-Route::post('/bookings/{id}/reject', [BookingController::class, 'rejectBooking']);
+Route::middleware('auth:sanctum')->post('/chat/user-conversation',     [ChatController::class, 'getOrCreatePrivateConversation']);
+Route::get('/bookings/{id}/conversation',                                 [ChatController::class, 'getSupportConversationForBooking']);
+Route::post('/bookings/{id}/accept',                                      [BookingController::class, 'acceptBooking']);
+Route::post('/bookings/{id}/reject',                                      [BookingController::class, 'rejectBooking']);
 
 // Consultas de bookings profesionales (pendientes, aceptados y todos)
 Route::get('/bookings/professional/{id}/pending', function ($id) {

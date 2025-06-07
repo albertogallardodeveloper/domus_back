@@ -2,7 +2,6 @@
 
 namespace App\Mail;
 
-use App\Models\UserApp;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
@@ -11,23 +10,26 @@ class EmailVerificationMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public $user;
-    public $code;
+    public string $email;
+    public string $code;
 
-    public function __construct(UserApp $user, string $code)
+    /**
+     * Ahora recibe el email (string) y el código.
+     */
+    public function __construct(string $email, string $code)
     {
-        $this->user = $user;
-        $this->code = $code;
+        $this->email = $email;
+        $this->code  = $code;
     }
 
     public function build()
     {
         return $this
             ->subject('Tu código de verificación Domus')
-            ->view('emails.verify_email') // vista Blade que vamos a crear
+            ->view('emails.verify_email')
             ->with([
-                'name' => $this->user->name,
-                'code' => $this->code,
+                'email' => $this->email,
+                'code'  => $this->code,
             ]);
     }
 }
