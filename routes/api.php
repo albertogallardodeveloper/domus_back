@@ -38,6 +38,10 @@ Route::post('/verify-email-code',      [AuthController::class, 'verifyCode']);
 Route::post('/verify-email',           [AuthController::class, 'verifyEmail']);
 Route::post('/resend-verification',    [AuthController::class, 'resendVerification']);
 
+// 🔒 Password reset
+Route::post('/forgot-password', [UserAppController::class, 'forgotPassword']);
+Route::post('/reset-password',  [UserAppController::class, 'resetPassword']);
+
 // 🔐 Usuario autenticado (solo si usas Sanctum)
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();

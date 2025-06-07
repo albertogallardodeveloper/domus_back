@@ -212,4 +212,6 @@ return [
         // 'ExampleClass' => App\Example\ExampleClass::class,
     ])->toArray(),
 
+    'client_url' => env('APP_CLIENT_URL'),
+
 ];
