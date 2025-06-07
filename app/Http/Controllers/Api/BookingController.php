@@ -20,7 +20,7 @@ use Carbon\Carbon;
 
 class BookingController extends Controller
 {
-    public function store(Request $request)
+   public function store(Request $request)
     {
         $request->validate([
             'user_app_id' => 'required|exists:users_app,id',
@@ -63,10 +63,10 @@ class BookingController extends Controller
         try {
             \Log::info('Clave Stripe usada:', ['clave' => env('STRIPE_SECRET')]);
 
-            Stripe::setApiKey(env('STRIPE_SECRET'));
+            Stripe::setApiKey(config('services.stripe.secret'));
 
-            // === NUEVO: Stripe Connect con comisión ===
-            // Suponemos que el servicio tiene relación ->professional y este tiene stripe_account_id
+            // --- NUEVO: Stripe Connect con comisión ---
+            // Relación del servicio con el profesional
             $professional = $service->professional;
 
             if (! $professional || ! $professional->stripe_account_id) {
@@ -89,18 +89,20 @@ class BookingController extends Controller
                 ]
             ]);
 
+            // === NUEVO: Guardar el professional_id en el booking ===
             $booking = Booking::create([
-                'user_app_id' => $request->user_app_id,
-                'service_id' => $request->service_id,
-                'price' => $discountedTotal,
-                'duration' => $request->duration,
-                'address' => $request->address,
-                'service_day' => $request->service_day,
-                'status' => 'pending',
+                'user_app_id'     => $request->user_app_id,       // Cliente
+                'service_id'      => $request->service_id,
+                'professional_id' => $service->user_app_id,        // Profesional del servicio
+                'price'           => $discountedTotal,
+                'duration'        => $request->duration,
+                'address'         => $request->address,
+                'service_day'     => $request->service_day,
+                'status'          => 'pending',
                 'stripe_payment_intent_id' => $paymentIntent->id,
-                'platform_fee' => $platformFee,
+                'platform_fee'    => $platformFee,
                 'additional_details' => $request->additional_details,
-                'promo_code_id' => $promoCode?->id,
+                'promo_code_id'   => $promoCode?->id,
             ]);
 
             if ($promoCode) {

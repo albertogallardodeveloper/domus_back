@@ -140,10 +140,11 @@ Route::get('/bookings/professional/{id}/pending', function ($id) {
 });
 Route::get('/bookings/professional/{id}/accepted', function ($id) {
     return \App\Models\Booking::with(['user','service'])
-        ->whereHas('service', fn($q)=> $q->where('user_app_id',$id))
+        ->where('professional_id', $id) // CAMBIADO: busca por el profesional asignado, no por el servicio
         ->where('status','confirmed')
         ->orderBy('service_day')->get();
 });
+
 Route::get('/bookings/professional/{id}/all', function ($id) {
     return \App\Models\Booking::with(['user','service'])
         ->whereHas('service', fn($q)=> $q->where('user_app_id',$id))
