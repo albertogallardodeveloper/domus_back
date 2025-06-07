@@ -11,6 +11,7 @@ use App\Mail\EmailVerificationMail;
 use Stripe\Stripe;
 use Stripe\Account;
 use Stripe\AccountLink;
+use Stripe\Exception\InvalidRequestException;
 
 class UserAppController extends Controller
 {
@@ -21,6 +22,7 @@ class UserAppController extends Controller
 
     public function store(Request $request)
     {
+        // 1) Validación
         $validated = $request->validate([
             'name'             => 'required|string|max:255',
             'last_name'        => 'required|string|max:255',
@@ -37,24 +39,25 @@ class UserAppController extends Controller
             'addresses'        => 'array',
         ]);
 
+        // 2) Hash de la contraseña
         $validated['password'] = bcrypt($validated['password']);
 
-        // 1) Crear el usuario (email_verified por defecto en false)
+        // 3) Crear usuario en la base de datos
         $user = UserApp::create([
-            'name'                   => $validated['name'],
-            'last_name'              => $validated['last_name'],
-            'email'                  => $validated['email'],
-            'password'               => $validated['password'],
-            'profile_picture'        => $validated['profile_picture'] ?? null,
-            'phone_number'           => $validated['phone_number'] ?? null,
-            'is_client'              => $validated['is_client'] ?? false,
-            'is_professional'        => $validated['is_professional'] ?? false,
-            'privacy_policy'         => $validated['privacy_policy'],
-            'terms_conditions'       => $validated['terms_conditions'],
-            'email_verified'         => false,
+            'name'             => $validated['name'],
+            'last_name'        => $validated['last_name'],
+            'email'            => $validated['email'],
+            'password'         => $validated['password'],
+            'profile_picture'  => $validated['profile_picture'] ?? null,
+            'phone_number'     => $validated['phone_number'] ?? null,
+            'is_client'        => $validated['is_client'] ?? false,
+            'is_professional'  => $validated['is_professional'] ?? false,
+            'privacy_policy'   => $validated['privacy_policy'],
+            'terms_conditions' => $validated['terms_conditions'],
+            'email_verified'   => true,
         ]);
 
-        // 2) Sincronizar relaciones
+        // 4) Sincronizar relaciones
         if ($request->has('languages')) {
             $user->languages()->sync($request->languages);
         }
@@ -70,46 +73,51 @@ class UserAppController extends Controller
             $user->addresses()->sync($addressIds);
         }
 
-        // 3) Generar código de verificación y enviar por correo
+        // 5) Enviar código de verificación por correo
         $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $user->email_verification_code = $code;
         $user->save();
-
         Mail::to($user->email)->send(new EmailVerificationMail($user, $code));
 
-        // 4) Si es profesional, crear cuenta Connect en Stripe
+        // 6) Stripe Connect (opcional)
         $accountLinkUrl = null;
-        if ($user->is_professional) {
-            Stripe::setApiKey(env('STRIPE_SECRET'));
+        if ($user->is_professional && config('services.stripe.connect_enabled')) {
+            try {
+                Stripe::setApiKey(config('services.stripe.secret'));
 
-            $account = Account::create([
-                'type'          => 'custom',
-                'country'       => 'ES',
-                'email'         => $user->email,
-                'business_type' => 'individual',
-                'capabilities'  => [
-                    'transfers' => ['requested' => true],
-                ],
-            ]);
+                // Crear cuenta Connect
+                $account = Account::create([
+                    'type'          => 'custom',
+                    'country'       => 'ES',
+                    'email'         => $user->email,
+                    'business_type' => 'individual',
+                    'capabilities'  => [
+                        'transfers' => ['requested' => true],
+                    ],
+                ]);
 
-            $user->stripe_account_id = $account->id;
-            $user->save();
+                $user->stripe_account_id = $account->id;
+                $user->save();
 
-            $accountLink = AccountLink::create([
-                'account'     => $account->id,
-                'refresh_url' => config('app.client_url') . '/onboarding/refresh',
-                'return_url'  => config('app.client_url') . '/onboarding/success',
-                'type'        => 'account_onboarding',
-            ]);
+                // Generar link de onboarding
+                $accountLink = AccountLink::create([
+                    'account'     => $account->id,
+                    'refresh_url' => config('app.client_url') . '/onboarding/refresh',
+                    'return_url'  => config('app.client_url') . '/onboarding/success',
+                    'type'        => 'account_onboarding',
+                ]);
 
-            $accountLinkUrl = $accountLink->url;
+                $accountLinkUrl = $accountLink->url;
+            } catch (InvalidRequestException $e) {
+                \Log::warning('Stripe Connect no disponible o error: ' . $e->getMessage());
+            }
         }
 
-        // 5) Devolver respuesta JSON (sin exponer el código en producción)
+        // 7) Respuesta JSON
         $response = [
-            'user'    => $user->load(['languages', 'locations', 'addresses']),
-            'message' => 'Usuario creado. Código de verificación enviado.',
-            'debug_code' => $code, // eliminar esta línea en producción
+            'user'        => $user->load(['languages', 'locations', 'addresses']),
+            'message'     => 'Usuario creado. Código de verificación enviado.',
+            'debug_code'  => $code, // eliminar en producción
         ];
 
         if ($accountLinkUrl) {
@@ -126,7 +134,7 @@ class UserAppController extends Controller
 
     public function update(Request $request, UserApp $users_app)
     {
-        // 1) Actualiza campos simples (sin password ni relaciones)
+        // 1) Actualizar campos básicos
         $users_app->update($request->except(['languages', 'locations', 'addresses', 'password']));
 
         // 2) Sincronizar idiomas
@@ -139,7 +147,7 @@ class UserAppController extends Controller
             $users_app->locations()->sync($request->locations);
         }
 
-        // 4) Direcciones: crea nuevas si no existen y sincroniza
+        // 4) Sincronizar direcciones
         if ($request->has('addresses')) {
             $addressIds = [];
             foreach ($request->addresses as $addrText) {
@@ -149,22 +157,28 @@ class UserAppController extends Controller
             $users_app->addresses()->sync($addressIds);
         }
 
-        // 5) Si cambió a profesional y no tiene stripe_account_id, crear cuenta Connect
-        if ($request->has('is_professional') && $users_app->is_professional && !$users_app->stripe_account_id) {
-            Stripe::setApiKey(env('STRIPE_SECRET'));
+        // 5) Stripe Connect on-demand
+        if ($request->has('is_professional')
+            && $users_app->is_professional
+            && !$users_app->stripe_account_id
+            && config('services.stripe.connect_enabled')) {
 
-            $account = Account::create([
-                'type'          => 'custom',
-                'country'       => 'ES',
-                'email'         => $users_app->email,
-                'business_type' => 'individual',
-                'capabilities'  => [
-                    'transfers' => ['requested' => true],
-                ],
-            ]);
-
-            $users_app->stripe_account_id = $account->id;
-            $users_app->save();
+            try {
+                Stripe::setApiKey(config('services.stripe.secret'));
+                $account = Account::create([
+                    'type'          => 'custom',
+                    'country'       => 'ES',
+                    'email'         => $users_app->email,
+                    'business_type' => 'individual',
+                    'capabilities'  => [
+                        'transfers' => ['requested' => true],
+                    ],
+                ]);
+                $users_app->stripe_account_id = $account->id;
+                $users_app->save();
+            } catch (InvalidRequestException $e) {
+                \Log::warning('Stripe Connect on-demand error: ' . $e->getMessage());
+            }
         }
 
         return $users_app->load(['languages', 'locations', 'addresses']);
@@ -180,10 +194,8 @@ class UserAppController extends Controller
     {
         $request->validate(['address' => 'required|string|max:255']);
         $user = UserApp::findOrFail($id);
-
         $address = Address::firstOrCreate(['address' => $request->address]);
         $user->addresses()->attach($address->id);
-
         return response()->json($address);
     }
 
