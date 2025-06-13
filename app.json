@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "45b5e698-4009-4ef7-a3ad-e766bd2b1ebc"
+      }
+    },
+    "android": {
+      "package": "com.albertogallardo.developer.domus_back"
+    }
+  }
+}

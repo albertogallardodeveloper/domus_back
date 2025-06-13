@@ -55,3 +55,7 @@ Route::middleware(['auth'])->prefix('admin/stripe')->name('admin.stripe.')->grou
     Route::get('/{id}', [App\Http\Controllers\Admin\StripeController::class, 'show'])->name('show');
     Route::post('/{id}/refund', [App\Http\Controllers\Admin\StripeController::class, 'refund'])->name('refund');
 });
+
+Route::get('/politica-de-privacidad', function () {
+    return view('public.privacy-policy');
+})->name('privacy-policy.public');

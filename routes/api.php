@@ -52,7 +52,6 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // 👤 CRUD de usuarios
-    Route::apiResource('users-app', UserAppController::class);
 
     // Añadir dirección a usuario
     Route::get('/users-app/{id}/addresses', [UserAppAddressController::class, 'index']);
@@ -68,18 +67,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/languages', [UserAppController::class, 'languages']);
     Route::get('/locations', [UserAppController::class, 'locations']);
 
-    // 📍 Países y ubicaciones
-    Route::apiResource('countries', CountryController::class);
-    Route::apiResource('locations', LocationController::class);
-
-    // 🌐 Idiomas completos
-    Route::apiResource('languages', LanguageController::class);
-
+ 
     // ❓ FAQs
     Route::apiResource('faqs', FaqController::class);
 
     // 🛠️ Servicios y categorías
-    Route::apiResource('service-categories', ServiceCategoryController::class);
     Route::apiResource('services', ServiceController::class);
     Route::get('/services/by-category/{id}', [ServiceController::class, 'byCategory']);
 
@@ -117,6 +109,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reviews/professional', [ReviewController::class, 'reviewsForProfessional']);
     Route::get('/reviews/client',       [ReviewController::class, 'reviewsByClient']);
 });
+    Route::apiResource('users-app', UserAppController::class);
+
+    Route::apiResource('service-categories', ServiceCategoryController::class);
+
+// 📍 Países y ubicaciones
+Route::apiResource('countries', CountryController::class);
+Route::apiResource('locations', LocationController::class);
+
+// 🌐 Idiomas completos
+Route::apiResource('languages', LanguageController::class);
 
 // 💬 Chat y bookings sin token (lectura pública)
 Route::get('/chat/conversations/{conversation}/messages', [ChatController::class, 'index']);
